@@ -33,7 +33,7 @@ void error(const __FlashStringHelper*err)
 }
 
 String addString(String value, String stringOriginal) {
-  value += ",";
+  value += " ";
   stringOriginal += value;
   return stringOriginal;
 }
@@ -113,16 +113,17 @@ void setup(void)
     while (1);
   }
 
-  BLEsetup();
-
   bno1.setExtCrystalUse(true);
   bno2.setExtCrystalUse(true);
+
+  BLEsetup();
+
 }
 
 void loop(void)
 {
   /* Get a new sensor event */
-  time = millis();
+
   uint8_t system, gyro, accel, mag = 0;
   bno1.getCalibration(&system, &gyro, &accel, &mag);
   uint8_t sys1 = system;
@@ -167,7 +168,6 @@ void loop(void)
   Serial.println(stringTwo);
 
   if (ble.isConnected()) {
-
     /* Display the floating point data */
     ble.print("AT+BLEUARTTX=");
     ble.print(stringTwo);

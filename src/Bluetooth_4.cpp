@@ -1,11 +1,10 @@
 
+#include <Arduino.h>
+#include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
-
-#include <Arduino.h>
-#include <SPI.h>
 #if not defined (_VARIANT_ARDUINO_DUE_X_) && not defined (_VARIANT_ARDUINO_ZERO_)
 #include <SoftwareSerial.h>
 #endif
@@ -33,12 +32,68 @@ void error(const __FlashStringHelper*err)
   while (1);
 }
 
+String addString(String value, String stringOriginal) {
+  value += ",";
+  stringOriginal += value;
+  return stringOriginal;
+}
+
+String addStringPlus( imu::Vector<3> dataIMU, String stringOriginal, int countDecimal) {
+  String value = String( dataIMU.x(), countDecimal);
+  stringOriginal = addString(value, stringOriginal);
+  value = String( dataIMU.y(), countDecimal);
+  stringOriginal = addString(value, stringOriginal);
+  value = String( dataIMU.z(), countDecimal);
+  stringOriginal = addString(value, stringOriginal);
+  return stringOriginal;
+}
+
+void BLEsetup() {
+    if ( !ble.begin(VERBOSE_MODE) )
+  {
+    error(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
+  }
+
+  Serial.println( F("OK!") );
+  ble.echo(false);
+  ble.info();
+  ble.verbose(false);
+//  while (! ble.isConnected()) {
+//    delay(500);
+//  }
+  ble.setMode(BLUEFRUIT_MODE_DATA);
+}
+
+void displaySensorOffsets(const adafruit_bno055_offsets_t &calibData)
+{
+    Serial.print("Accelerometer: ");
+    Serial.print(calibData.accel_offset_x); Serial.print(" ");
+    Serial.print(calibData.accel_offset_y); Serial.print(" ");
+    Serial.print(calibData.accel_offset_z); Serial.print(" ");
+
+    Serial.print("\nGyro: ");
+    Serial.print(calibData.gyro_offset_x); Serial.print(" ");
+    Serial.print(calibData.gyro_offset_y); Serial.print(" ");
+    Serial.print(calibData.gyro_offset_z); Serial.print(" ");
+
+    Serial.print("\nMag: ");
+    Serial.print(calibData.mag_offset_x); Serial.print(" ");
+    Serial.print(calibData.mag_offset_y); Serial.print(" ");
+    Serial.print(calibData.mag_offset_z); Serial.print(" ");
+
+    Serial.print("\nAccel Radius: ");
+    Serial.print(calibData.accel_radius);
+
+    Serial.print("\nMag Radius: ");
+    Serial.print(calibData.mag_radius);
+}
+
 void setup(void)
 {
   //while (!Serial);
   delay(500);
 
-  Serial.begin(115200);
+  Serial.begin(9600);
   Serial.println("Twin BNO055 Orientation Sensor Test");
   Serial.println("");
 
@@ -58,19 +113,7 @@ void setup(void)
     while (1);
   }
 
-  if ( !ble.begin(VERBOSE_MODE) )
-  {
-    error(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
-  }
-
-  Serial.println( F("OK!") );
-  ble.echo(false);
-  ble.info();
-  ble.verbose(false);
-  while (! ble.isConnected()) {
-    delay(500);
-  }
-  delay(1000);
+  BLEsetup();
 
   bno1.setExtCrystalUse(true);
   bno2.setExtCrystalUse(true);
@@ -86,7 +129,6 @@ void loop(void)
   bno2.getCalibration(&system, &gyro, &accel, &mag);
   uint8_t sys2 = system;
 
-  logtime = time;
   imu::Quaternion quat1 = bno1.getQuat();
   imu::Vector<3> gyro1 = bno1.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
   imu::Vector<3> acce1 = bno1.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
@@ -115,75 +157,21 @@ void loop(void)
     angle = (acos(product * 2 - sign) * 57.2958) * sign;
   }
 
-  Serial.print(" Data: ");
-  Serial.print(",");
-  Serial.print(angle);
-  Serial.print(",");
-  Serial.print(" Gyro 1: ");
-  Serial.print(",");
-  Serial.print(gyro1.x(), 0);
-  Serial.print(",");
-  Serial.print(gyro1.y(), 0);
-  Serial.print(",");
-  Serial.print(gyro1.z(), 0);
-  Serial.print(",");
-  Serial.print(" Acce 1: ");
-  Serial.print(",");
-  Serial.print(acce1.x(), 0);
-  Serial.print(",");
-  Serial.print(acce1.y(), 0);
-  Serial.print(",");
-  Serial.print(acce1.z(), 0);
-  Serial.print(",");
-  Serial.print(" Gyro 2: ");
-  Serial.print(",");
-  Serial.print(gyro2.x(), 0);
-  Serial.print(",");
-  Serial.print(gyro2.y(), 0);
-  Serial.print(",");
-  Serial.print(gyro2.z(), 0);
-  Serial.print(",");
-  Serial.print(" Acce 2: ");
-  Serial.print(",");
-  Serial.print(acce2.x(), 0);
-  Serial.print(",");
-  Serial.print(acce2.y(), 0);
-  Serial.print(",");
-  Serial.print(acce2.z(), 0);
-  Serial.print(",");
-  Serial.print(acos(abs(acce2.y()) / 10) * 57.2958, 0);
-  Serial.println("");
+  int countDecimal = 2;
+  String stringTwo = "";
+  stringTwo = addStringPlus(gyro1, stringTwo, countDecimal);
+  stringTwo = addStringPlus(acce1, stringTwo, countDecimal);
+  stringTwo = addStringPlus(gyro2, stringTwo, countDecimal);
+  stringTwo = addStringPlus(acce2, stringTwo, countDecimal);
+
+  Serial.println(stringTwo);
 
   if (ble.isConnected()) {
 
     /* Display the floating point data */
     ble.print("AT+BLEUARTTX=");
-    ble.print(angle, 2);
-    ble.print(",");
-    ble.print(gyro1.x(), 2);
-    ble.print(",");
-    ble.print(gyro1.y(), 2);
-    ble.print(",");
-    ble.print(gyro1.z(), 2);
-    ble.print(",");
-    ble.print(acce1.x(), 2);
-    ble.print(",");
-    ble.print(acce1.y(), 2);
-    ble.print(",");
-    ble.print(acce1.z(), 2);
-    ble.print(",");
-    ble.print(gyro2.x(), 2);
-    ble.print(",");
-    ble.print(gyro2.y(), 2);
-    ble.print(",");
-    ble.print(gyro2.z(), 2);
-    ble.print(",");
-    ble.print(acce2.x(), 2);
-    ble.print(",");
-    ble.print(acce2.y(), 2);
-    ble.print(",");
-    ble.print(acce2.z(), 2);
-    ble.print("");
+    ble.print(stringTwo);
     ble.println("\\r\\n");
   }
+
 }

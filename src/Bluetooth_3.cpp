@@ -5,6 +5,7 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
+
 #if not defined (_VARIANT_ARDUINO_DUE_X_) && not defined (_VARIANT_ARDUINO_ZERO_)
 #include <SoftwareSerial.h>
 #endif
@@ -12,7 +13,6 @@
 #include "Adafruit_BLE.h"
 #include "Adafruit_BluefruitLE_SPI.h"
 #include "Adafruit_BluefruitLE_UART.h"
-
 #include "BluefruitConfig.h"
 
 #define FACTORYRESET_ENABLE         1
@@ -32,13 +32,15 @@ void error(const __FlashStringHelper*err)
   while (1);
 }
 
-String addString(String value, String stringOriginal) {
+String addString(String value, String stringOriginal)
+{
   value += " ";
   stringOriginal += value;
   return stringOriginal;
 }
 
-String addStringPlus( imu::Vector<3> dataIMU, String stringOriginal, int countDecimal) {
+String addStringPlus( imu::Vector<3> dataIMU, String stringOriginal, int countDecimal)
+{
   String value = String( dataIMU.x(), countDecimal);
   stringOriginal = addString(value, stringOriginal);
   value = String( dataIMU.y(), countDecimal);
@@ -48,8 +50,27 @@ String addStringPlus( imu::Vector<3> dataIMU, String stringOriginal, int countDe
   return stringOriginal;
 }
 
-void BLEsetup() {
-    if ( !ble.begin(VERBOSE_MODE) )
+String CalibrationStatus(Adafruit_BNO055 bno, int code)
+{
+  uint8_t system, gyro, accel, mag;
+  system = gyro = accel = mag = 0;
+
+  bno.getCalibration(&system, &gyro, &accel, &mag);
+
+  String value = " ";
+  value += String(code);
+  value += String(system, DEC);
+  value += String(gyro, DEC);
+  value += String(accel, DEC);
+  value += String(mag, DEC);
+
+  return value;
+
+}
+
+void BLEsetup()
+{
+  if ( !ble.begin(VERBOSE_MODE) )
   {
     error(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
   }
@@ -58,46 +79,14 @@ void BLEsetup() {
   ble.echo(false);
   ble.info();
   ble.verbose(false);
-//  while (! ble.isConnected()) {
-//    delay(500);
-//  }
-  ble.setMode(BLUEFRUIT_MODE_DATA);
+  //  while (! ble.isConnected()) {
+  //    delay(500);
+  //  }
+  // ble.setMode(BLUEFRUIT_MODE_DATA);
 }
 
-void displaySensorOffsets(const adafruit_bno055_offsets_t &calibData)
+void Sensorsetup(void)
 {
-    Serial.print("Accelerometer: ");
-    Serial.print(calibData.accel_offset_x); Serial.print(" ");
-    Serial.print(calibData.accel_offset_y); Serial.print(" ");
-    Serial.print(calibData.accel_offset_z); Serial.print(" ");
-
-    Serial.print("\nGyro: ");
-    Serial.print(calibData.gyro_offset_x); Serial.print(" ");
-    Serial.print(calibData.gyro_offset_y); Serial.print(" ");
-    Serial.print(calibData.gyro_offset_z); Serial.print(" ");
-
-    Serial.print("\nMag: ");
-    Serial.print(calibData.mag_offset_x); Serial.print(" ");
-    Serial.print(calibData.mag_offset_y); Serial.print(" ");
-    Serial.print(calibData.mag_offset_z); Serial.print(" ");
-
-    Serial.print("\nAccel Radius: ");
-    Serial.print(calibData.accel_radius);
-
-    Serial.print("\nMag Radius: ");
-    Serial.print(calibData.mag_radius);
-}
-
-void setup(void)
-{
-  //while (!Serial);
-  delay(500);
-
-  Serial.begin(9600);
-  Serial.println("Twin BNO055 Orientation Sensor Test");
-  Serial.println("");
-
-  /* Initialise the first sensor */
   if (!bno1.begin())
   {
     /* There was a problem detecting the BNO055 at 0x28 ... check your connections */
@@ -115,20 +104,129 @@ void setup(void)
 
   bno1.setExtCrystalUse(true);
   bno2.setExtCrystalUse(true);
+}
+
+
+
+void displaySensorOffsets(const adafruit_bno055_offsets_t &calibData, int code)
+{
+  Serial.print(code);
+  Serial.print(" ");
+  Serial.print("Accelerometer: ");
+  Serial.print(calibData.accel_offset_x); Serial.print(" ");
+  Serial.print(calibData.accel_offset_y); Serial.print(" ");
+  Serial.print(calibData.accel_offset_z); Serial.print(" ");
+
+  Serial.print("\nGyro: ");
+  Serial.print(calibData.gyro_offset_x); Serial.print(" ");
+  Serial.print(calibData.gyro_offset_y); Serial.print(" ");
+  Serial.print(calibData.gyro_offset_z); Serial.print(" ");
+
+  Serial.print("\nMag: ");
+  Serial.print(calibData.mag_offset_x); Serial.print(" ");
+  Serial.print(calibData.mag_offset_y); Serial.print(" ");
+  Serial.print(calibData.mag_offset_z); Serial.print(" ");
+
+  Serial.print("\nAccel Radius: ");
+  Serial.print(calibData.accel_radius);
+
+  Serial.print("\nMag Radius: ");
+  Serial.println(calibData.mag_radius);
+}
+
+adafruit_bno055_offsets_t CalibrationParam(
+                                            int16_t accel_x,
+                                            int16_t accel_y,
+                                            int16_t accel_z,
+                                            int16_t gyro_x,
+                                            int16_t gyro_y,
+                                            int16_t gyro_z,
+                                            int16_t mag_x,
+                                            int16_t mag_y,
+                                            int16_t mag_z,
+                                            int16_t accel_radius,
+                                            int16_t mag_radius
+                                          )
+{
+  adafruit_bno055_offsets_t CalibrationParam;
+  CalibrationParam.accel_offset_x = accel_x;
+  CalibrationParam.accel_offset_y = accel_y;
+  CalibrationParam.accel_offset_z = accel_z;
+  CalibrationParam.gyro_offset_x = gyro_x;
+  CalibrationParam.gyro_offset_y = gyro_y;
+  CalibrationParam.gyro_offset_z = gyro_z;
+  CalibrationParam.mag_offset_x = mag_x;
+  CalibrationParam.mag_offset_y = mag_y;
+  CalibrationParam.mag_offset_z = mag_z;
+  CalibrationParam.accel_radius = accel_radius;
+  CalibrationParam.mag_radius = mag_radius;
+  return CalibrationParam;
+}
+
+void Calibrationsetup(Adafruit_BNO055 bno1, Adafruit_BNO055 bno2)
+{
+  adafruit_bno055_offsets_t calibrationData;
+  calibrationData = CalibrationParam(-10,	40,	9,	-1,	0,	0,	224,	-14,	-119,	1000, 766);
+  bno1.setSensorOffsets(calibrationData);
+
+  calibrationData = CalibrationParam(12,	-31,	4,	0,	1,	-1,	-714,	-837,	-840,	1000,	776);
+  bno2.setSensorOffsets(calibrationData);
+
+  bool all_Calibrated = false;
+  while (!all_Calibrated)
+  {
+    String statusCal_bno1 = CalibrationStatus(bno1, 1);
+    String statusCal_bno2 = CalibrationStatus(bno2, 2);
+    Serial.print("BNO1: "); Serial.print(statusCal_bno1);
+    Serial.print(" BNO2: "); Serial.println(statusCal_bno2);
+    if (bno1.isFullyCalibrated() && bno2.isFullyCalibrated())
+    {
+      all_Calibrated = true;
+    }
+  }
+  bno1.getSensorOffsets(calibrationData);
+  displaySensorOffsets(calibrationData, 1);
+
+  bno2.getSensorOffsets(calibrationData);
+  displaySensorOffsets(calibrationData, 2);
+
+  String statusCal_bno1 = CalibrationStatus(bno1, 1);
+  String statusCal_bno2 = CalibrationStatus(bno2, 2);
+  Serial.print("BNO1: "); Serial.print(statusCal_bno1);
+  Serial.print(" BNO2: "); Serial.println(statusCal_bno2);
+
+  // Check for incoming characters from Bluefruit
+  // if (ble.isConnected())
+  // {
+  //   ble.println("AT+BLEUARTRX");
+  //   ble.readline();
+  //   if (strcmp(ble.buffer, "OK") == 0) {
+  //     return;
+  //   }
+  //   // Some data was found, its in the buffer
+  //   Serial.print(F("[Recv] "));
+  //   Serial.println(ble.buffer);
+  //   ble.waitForOK();
+  // }
+}
+
+void setup(void)
+{
+  delay(500);
+
+  Serial.begin(9600);
 
   BLEsetup();
+  Sensorsetup();
+  Calibrationsetup(bno1, bno2);
 
 }
 
 void loop(void)
 {
-  /* Get a new sensor event */
 
-  uint8_t system, gyro, accel, mag = 0;
-  bno1.getCalibration(&system, &gyro, &accel, &mag);
-  uint8_t sys1 = system;
-  bno2.getCalibration(&system, &gyro, &accel, &mag);
-  uint8_t sys2 = system;
+  String status_bno1 = CalibrationStatus(bno1, 1);
+  String status_bno2 = CalibrationStatus(bno2, 2);
 
   imu::Quaternion quat1 = bno1.getQuat();
   imu::Vector<3> gyro1 = bno1.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
@@ -164,14 +262,21 @@ void loop(void)
   stringTwo = addStringPlus(acce1, stringTwo, countDecimal);
   stringTwo = addStringPlus(gyro2, stringTwo, countDecimal);
   stringTwo = addStringPlus(acce2, stringTwo, countDecimal);
+  stringTwo = addString(status_bno1, stringTwo);
+  stringTwo = addString(status_bno2, stringTwo);
 
-  Serial.println(stringTwo);
+  //Serial.println(stringTwo);
 
   if (ble.isConnected()) {
-    /* Display the floating point data */
     ble.print("AT+BLEUARTTX=");
     ble.print(stringTwo);
     ble.println("\\r\\n");
   }
+
+  // ble.println("AT+BLEUARTFIFO=TX");
+  // ble.readline();
+  // Serial.print("TX FIFO: ");
+  // Serial.println(ble.buffer);
+
 
 }

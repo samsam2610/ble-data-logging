@@ -83,6 +83,7 @@ void BLEsetup()
   //    delay(500);
   //  }
   // ble.setMode(BLUEFRUIT_MODE_DATA);
+  delay(3000);
 }
 
 void Sensorsetup(void)
@@ -103,7 +104,9 @@ void Sensorsetup(void)
   }
 
   bno1.setExtCrystalUse(true);
+  delay(1000);
   bno2.setExtCrystalUse(true);
+  delay(1000);
 }
 
 
@@ -166,23 +169,36 @@ adafruit_bno055_offsets_t CalibrationParam(
 void Calibrationsetup(Adafruit_BNO055 bno1, Adafruit_BNO055 bno2)
 {
   adafruit_bno055_offsets_t calibrationData;
-  calibrationData = CalibrationParam(-10,	40,	9,	-1,	0,	0,	224,	-14,	-119,	1000, 766);
+  calibrationData = CalibrationParam(-7,	36,	11,	-1,	0,	0,	213,	-9,	-123,	1000,	779);
   bno1.setSensorOffsets(calibrationData);
+  delay(5000);
+  bno1.getSensorOffsets(calibrationData);
+  displaySensorOffsets(calibrationData, 1);
+  String statusCal_bno1 = CalibrationStatus(bno1, 1);
+  Serial.print("BNO1: "); Serial.println(statusCal_bno1);
 
-  calibrationData = CalibrationParam(12,	-31,	4,	0,	1,	-1,	-714,	-837,	-840,	1000,	776);
+  calibrationData = CalibrationParam(13,	-23,	1,	-1,	1,	-1,	-715,	-923,	-866,	1000,	760);
   bno2.setSensorOffsets(calibrationData);
+  delay(5000);
+  bno2.getSensorOffsets(calibrationData);
+  displaySensorOffsets(calibrationData, 2);
+  String statusCal_bno2 = CalibrationStatus(bno2, 2);
+  Serial.print("BNO2: "); Serial.println(statusCal_bno2);
+
+  delay(5000);
 
   bool all_Calibrated = false;
   while (!all_Calibrated)
   {
-    String statusCal_bno1 = CalibrationStatus(bno1, 1);
-    String statusCal_bno2 = CalibrationStatus(bno2, 2);
+    statusCal_bno1 = CalibrationStatus(bno1, 1);
+    statusCal_bno2 = CalibrationStatus(bno2, 2);
     Serial.print("BNO1: "); Serial.print(statusCal_bno1);
     Serial.print(" BNO2: "); Serial.println(statusCal_bno2);
     if (bno1.isFullyCalibrated() && bno2.isFullyCalibrated())
     {
       all_Calibrated = true;
     }
+    delay(100);
   }
   bno1.getSensorOffsets(calibrationData);
   displaySensorOffsets(calibrationData, 1);
@@ -190,28 +206,16 @@ void Calibrationsetup(Adafruit_BNO055 bno1, Adafruit_BNO055 bno2)
   bno2.getSensorOffsets(calibrationData);
   displaySensorOffsets(calibrationData, 2);
 
-  String statusCal_bno1 = CalibrationStatus(bno1, 1);
-  String statusCal_bno2 = CalibrationStatus(bno2, 2);
+  statusCal_bno1 = CalibrationStatus(bno1, 1);
+  statusCal_bno2 = CalibrationStatus(bno2, 2);
   Serial.print("BNO1: "); Serial.print(statusCal_bno1);
   Serial.print(" BNO2: "); Serial.println(statusCal_bno2);
 
-  // Check for incoming characters from Bluefruit
-  // if (ble.isConnected())
-  // {
-  //   ble.println("AT+BLEUARTRX");
-  //   ble.readline();
-  //   if (strcmp(ble.buffer, "OK") == 0) {
-  //     return;
-  //   }
-  //   // Some data was found, its in the buffer
-  //   Serial.print(F("[Recv] "));
-  //   Serial.println(ble.buffer);
-  //   ble.waitForOK();
-  // }
 }
 
 void setup(void)
 {
+  while (!Serial);
   delay(500);
 
   Serial.begin(9600);
@@ -219,6 +223,7 @@ void setup(void)
   BLEsetup();
   Sensorsetup();
   Calibrationsetup(bno1, bno2);
+
 
 }
 

@@ -3,8 +3,8 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-#include <Adafruit_BNO055.h>
-#include <utility/imumaths.h>
+#include "Adafruit_BNO055.h"
+#include "utility/imumaths.h"
 
 #if not defined (_VARIANT_ARDUINO_DUE_X_) && not defined (_VARIANT_ARDUINO_ZERO_)
 #include <SoftwareSerial.h>
@@ -32,21 +32,21 @@ void error(const __FlashStringHelper*err)
   while (1);
 }
 
-String addString(String value, String stringOriginal)
+String addString(String value, String stringOriginal, String separator)
 {
-  value += " ";
+  value += separator;
   stringOriginal += value;
   return stringOriginal;
 }
 
-String addStringPlus( imu::Vector<3> dataIMU, String stringOriginal, int countDecimal)
+String addStringPlus( imu::Vector<3> dataIMU, String stringOriginal, int countDecimal, String seperator)
 {
   String value = String( dataIMU.x(), countDecimal);
-  stringOriginal = addString(value, stringOriginal);
+  stringOriginal = addString(value, stringOriginal, seperator);
   value = String( dataIMU.y(), countDecimal);
-  stringOriginal = addString(value, stringOriginal);
+  stringOriginal = addString(value, stringOriginal, seperator);
   value = String( dataIMU.z(), countDecimal);
-  stringOriginal = addString(value, stringOriginal);
+  stringOriginal = addString(value, stringOriginal, seperator);
   return stringOriginal;
 }
 
@@ -171,7 +171,7 @@ void Calibrationsetup(Adafruit_BNO055 bno1, Adafruit_BNO055 bno2)
   adafruit_bno055_offsets_t calibrationData;
   calibrationData = CalibrationParam(-7,	36,	11,	-1,	0,	0,	213,	-9,	-123,	1000,	779);
   bno1.setSensorOffsets(calibrationData);
-  delay(5000);
+  delay(1000);
   bno1.getSensorOffsets(calibrationData);
   displaySensorOffsets(calibrationData, 1);
   String statusCal_bno1 = CalibrationStatus(bno1, 1);
@@ -179,37 +179,31 @@ void Calibrationsetup(Adafruit_BNO055 bno1, Adafruit_BNO055 bno2)
 
   calibrationData = CalibrationParam(13,	-23,	1,	-1,	1,	-1,	-715,	-923,	-866,	1000,	760);
   bno2.setSensorOffsets(calibrationData);
-  delay(5000);
+  delay(1000);
   bno2.getSensorOffsets(calibrationData);
   displaySensorOffsets(calibrationData, 2);
   String statusCal_bno2 = CalibrationStatus(bno2, 2);
   Serial.print("BNO2: "); Serial.println(statusCal_bno2);
+  delay(1000);
 
-  delay(5000);
-
-  bool all_Calibrated = false;
-  while (!all_Calibrated)
-  {
-    statusCal_bno1 = CalibrationStatus(bno1, 1);
-    statusCal_bno2 = CalibrationStatus(bno2, 2);
-    Serial.print("BNO1: "); Serial.print(statusCal_bno1);
-    Serial.print(" BNO2: "); Serial.println(statusCal_bno2);
-    if (bno1.isFullyCalibrated() && bno2.isFullyCalibrated())
-    {
-      all_Calibrated = true;
-    }
-    delay(100);
-  }
+  // bool all_Calibrated = false;
+  // while (!all_Calibrated)
+  // {
+  //   statusCal_bno1 = CalibrationStatus(bno1, 1);
+  //   statusCal_bno2 = CalibrationStatus(bno2, 2);
+  //   Serial.print("BNO1: "); Serial.print(statusCal_bno1);
+  //   Serial.print(" BNO2: "); Serial.println(statusCal_bno2);
+  //   if (bno1.isFullyCalibrated() && bno2.isFullyCalibrated())
+  //   {
+  //     all_Calibrated = true;
+  //   }
+  //   delay(100);
+  // }
   bno1.getSensorOffsets(calibrationData);
   displaySensorOffsets(calibrationData, 1);
 
   bno2.getSensorOffsets(calibrationData);
   displaySensorOffsets(calibrationData, 2);
-
-  statusCal_bno1 = CalibrationStatus(bno1, 1);
-  statusCal_bno2 = CalibrationStatus(bno2, 2);
-  Serial.print("BNO1: "); Serial.print(statusCal_bno1);
-  Serial.print(" BNO2: "); Serial.println(statusCal_bno2);
 
 }
 
@@ -219,7 +213,6 @@ void setup(void)
   delay(500);
 
   Serial.begin(9600);
-
   BLEsetup();
   Sensorsetup();
   Calibrationsetup(bno1, bno2);
@@ -227,6 +220,8 @@ void setup(void)
 
 }
 
+
+//
 void loop(void)
 {
 
@@ -241,36 +236,31 @@ void loop(void)
   imu::Vector<3> gyro2 = bno2.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
   imu::Vector<3> acce2 = bno2.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
 
-  float w1 = quat1.w();
-  float x1 = quat1.x();
-  float y1 = quat1.y();
-  float z1 = quat1.z();
-  float w2 = quat2.w();
-  float x2 = quat2.x();
-  float y2 = quat2.y();
-  float z2 = quat2.z();
+  quat1 = quat1.normalize();
+  delay(10);
+  quat2 = quat2.normalize();
+  delay(10);
+
   int sign = 1;
 
-  float norm1 = sqrt(pow(w1, 2) + pow(x1, 2) + pow(y1, 2) + pow(z1, 2));
-  float norm2 = sqrt(pow(w2, 2) + pow(x2, 2) + pow(y2, 2) + pow(z2, 2));
-
-  float product = ((w1 / norm1) * (w2 / norm2)) - ((x1 / norm1) * (x2 / norm2)) - ((y1 / norm1) * (y2 / norm2)) - ((z1 / norm1) * (z2 / norm2));
+  float product = (quat1.w() * quat2.w() - quat1.x() * quat2.x() - quat1.y() * quat2.y() - quat1.z() * quat2.z());
   float  angle = (acos((product * 2 - 1) * sign) * 57.2958);
   if (isnan(angle)) {
     sign = -1;
     angle = (acos(product * 2 - sign) * 57.2958) * sign;
   }
 
+  Serial.println(angle);
+
   int countDecimal = 2;
   String stringTwo = "";
-  stringTwo = addStringPlus(gyro1, stringTwo, countDecimal);
-  stringTwo = addStringPlus(acce1, stringTwo, countDecimal);
-  stringTwo = addStringPlus(gyro2, stringTwo, countDecimal);
-  stringTwo = addStringPlus(acce2, stringTwo, countDecimal);
-  stringTwo = addString(status_bno1, stringTwo);
-  stringTwo = addString(status_bno2, stringTwo);
-
-  //Serial.println(stringTwo);
+  String seperator = " ";
+  stringTwo = addStringPlus(gyro1, stringTwo, countDecimal, seperator);
+  stringTwo = addStringPlus(acce1, stringTwo, countDecimal, seperator);
+  stringTwo = addStringPlus(gyro2, stringTwo, countDecimal, seperator);
+  stringTwo = addStringPlus(acce2, stringTwo, countDecimal, seperator);
+  stringTwo = addString(status_bno1, stringTwo, seperator);
+  stringTwo = addString(status_bno2, stringTwo, seperator);
 
   if (ble.isConnected()) {
     ble.print("AT+BLEUARTTX=");

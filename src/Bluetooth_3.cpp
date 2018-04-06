@@ -23,8 +23,18 @@
 Adafruit_BNO055 bno1 = Adafruit_BNO055(55, 0x29);
 Adafruit_BNO055 bno2 = Adafruit_BNO055(56, 0x28);
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
-unsigned long time;
+unsigned long old_time;
+unsigned long new_time;
+unsigned interval_time;
 uint32_t logtime;
+
+double acce_1[3][2] = {{0,0}, {0,0}, {0,0}};
+double vel_1[3][2] = {{0,0}, {0,0}, {0,0}};
+double pos_1[3][2] = {{0,0}, {0,0}, {0,0}};
+
+double acce_2[3][2] = {{0,0}, {0,0}, {0,0}};
+double vel_2[3][2] = {{0,0}, {0,0}, {0,0}};
+double pos_2[3][2] = {{0,0}, {0,0}, {0,0}};
 
 void error(const __FlashStringHelper*err)
 {
@@ -47,6 +57,16 @@ String addStringPlus( imu::Vector<3> dataIMU, String stringOriginal, int countDe
   stringOriginal = addString(value, stringOriginal, seperator);
   value = String( dataIMU.z(), countDecimal);
   stringOriginal = addString(value, stringOriginal, seperator);
+  return stringOriginal;
+}
+
+String addStringArray(double array[], int size, String stringOriginal,int countDecimal, String seperator)
+{
+  for (int j = 0; j < size + 1; j++)
+  {
+    String value = String(array[j], countDecimal);
+    stringOriginal = addString(value, stringOriginal, seperator);
+  }
   return stringOriginal;
 }
 
@@ -224,24 +244,53 @@ void setup(void)
 //
 void loop(void)
 {
+  new_time = millis();
 
   String status_bno1 = CalibrationStatus(bno1, 1);
   String status_bno2 = CalibrationStatus(bno2, 2);
 
   imu::Quaternion quat1 = bno1.getQuat();
   imu::Vector<3> gyro1 = bno1.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
-  imu::Vector<3> acce1 = bno1.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+  imu::Vector<3> acce1 = bno1.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
 
   imu::Quaternion quat2 = bno2.getQuat();
   imu::Vector<3> gyro2 = bno2.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
-  imu::Vector<3> acce2 = bno2.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+  imu::Vector<3> acce2 = bno2.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
 
   quat1 = quat1.normalize();
-  delay(10);
   quat2 = quat2.normalize();
-  delay(10);
 
   int sign = 1;
+
+  acce_1[0][0] = acce1.x();
+  acce_1[0][1] = acce1.y();
+  acce_1[0][2] = acce1.z();
+
+  acce_2[0][0] = acce2.x();
+  acce_2[0][1] = acce2.y();
+  acce_2[0][2] = acce2.z();
+
+  for (int j = 0; j < 3; j++)
+  {
+    // get the velocity
+    vel_1[j][1] = vel_1[j][0] + acce_1[j][0] * interval_time * 0.001;
+    vel_2[j][1] = vel_2[j][0] + acce_2[j][0] * interval_time * 0.001;
+    // get the distance
+    pos_1[j][1] = pos_1[j][0] + vel_1[j][0] * interval_time * 0.001;
+    pos_2[j][1] = pos_2[j][0] + vel_2[j][0] * interval_time * 0.001;
+
+    // get ready for the next set of readings
+    acce_1[j][0] = acce_1[j][1];
+    vel_1[j][0] = vel_1[j][1];
+    pos_1[j][0] = pos_1[j][1];
+
+    acce_2[j][0] = acce_2[j][1];
+    vel_2[j][0] = vel_2[j][1];
+    pos_2[j][0] = pos_2[j][1];
+  }
+
+
+
 
   float product = (quat1.w() * quat2.w() - quat1.x() * quat2.x() - quat1.y() * quat2.y() - quat1.z() * quat2.z());
   float  angle = (acos((product * 2 - 1) * sign) * 57.2958);
@@ -250,7 +299,6 @@ void loop(void)
     angle = (acos(product * 2 - sign) * 57.2958) * sign;
   }
 
-  Serial.println(angle);
 
   int countDecimal = 2;
   String stringTwo = "";
@@ -268,6 +316,14 @@ void loop(void)
     ble.println("\\r\\n");
   }
 
+  String pos_Data = "";
+  seperator = ",";
+  pos_Data = addStringArray(vel_1[0], 2, pos_Data, countDecimal, seperator);
+  pos_Data = addStringArray(vel_2[0], 2, pos_Data, countDecimal, seperator);
+  Serial.println(pos_Data);
+
+  interval_time = new_time - old_time;
+  old_time = new_time;
   // ble.println("AT+BLEUARTFIFO=TX");
   // ble.readline();
   // Serial.print("TX FIFO: ");

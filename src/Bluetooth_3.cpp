@@ -28,13 +28,34 @@ unsigned long new_time;
 unsigned interval_time;
 uint32_t logtime;
 
-double acce_1[3][2] = {{0,0}, {0,0}, {0,0}};
-double vel_1[3][2] = {{0,0}, {0,0}, {0,0}};
-double pos_1[3][2] = {{0,0}, {0,0}, {0,0}};
+double acce_1_mag = 0;
+double acce_1_new[3] = {0, 0, 0};
+double acce_1_new_LP_filtered[3] = {0, 0, 0};
+double acce_1_new_HP_filtered[3] = {0, 0, 0};
+double vel_1_new[3] = {0, 0, 0};
+double pos_1_new[3] = {0, 0, 0};
 
-double acce_2[3][2] = {{0,0}, {0,0}, {0,0}};
-double vel_2[3][2] = {{0,0}, {0,0}, {0,0}};
-double pos_2[3][2] = {{0,0}, {0,0}, {0,0}};
+double acce_1_old[3] = {0, 0, 0};
+double acce_1_old_LP_filtered[3] = {0, 0, 0};
+double acce_1_old_HP_filtered[3] = {0, 0, 0};
+double vel_1_old[3] = {0, 0, 0};
+double pos_1_old[3] = {0, 0, 0};
+
+double acce_2_mag = 0;
+double acce_2_new[3] = {0, 0, 0};
+double acce_2_new_LP_filtered[3] = {0, 0, 0};
+double acce_2_new_HP_filtered[3] = {0, 0, 0};
+double vel_2_new[3] = {0, 0, 0};
+double pos_2_new[3] = {0, 0, 0};
+
+double acce_2_old[3] = {0, 0, 0};
+double acce_2_old_LP_filtered[3] = {0, 0, 0};
+double acce_2_old_HP_filtered[3] = {0, 0, 0};
+double vel_2_old[3] = {0, 0, 0};
+double pos_2_old[3] = {0, 0, 0};
+
+double a[2] = {0, 0};
+double b[2] = {0, 0};
 
 void error(const __FlashStringHelper*err)
 {
@@ -60,9 +81,9 @@ String addStringPlus( imu::Vector<3> dataIMU, String stringOriginal, int countDe
   return stringOriginal;
 }
 
-String addStringArray(double array[], int size, String stringOriginal,int countDecimal, String seperator)
+String addStringArray(double array[], String stringOriginal, int countDecimal, String seperator)
 {
-  for (int j = 0; j < size + 1; j++)
+  for (int j = 0; j < 3; j++)
   {
     String value = String(array[j], countDecimal);
     stringOriginal = addString(value, stringOriginal, seperator);
@@ -86,6 +107,13 @@ String CalibrationStatus(Adafruit_BNO055 bno, int code)
 
   return value;
 
+}
+
+double butter_filter(double raw_new, double raw_old, double prev, double a[], double b[])
+{
+  double output;
+  output = b[0]*raw_new + b[1]*raw_old - a[1]*prev;
+  return output;
 }
 
 void BLEsetup()
@@ -261,36 +289,67 @@ void loop(void)
   quat2 = quat2.normalize();
 
   int sign = 1;
+  acce_1_new[0] = double(acce1.x());
+  acce_1_new[1] = double(acce1.y());
+  acce_1_new[2] = double(acce1.z());
 
-  acce_1[0][0] = acce1.x();
-  acce_1[0][1] = acce1.y();
-  acce_1[0][2] = acce1.z();
-
-  acce_2[0][0] = acce2.x();
-  acce_2[0][1] = acce2.y();
-  acce_2[0][2] = acce2.z();
+  acce_2_new[0] = double(acce2.x());
+  acce_2_new[1] = double(acce2.y());
+  acce_2_new[2] = double(acce2.z());
 
   for (int j = 0; j < 3; j++)
   {
+    //high-pass filter acceleration data
+    a[0] = 1;
+    a[1] = -0.9999;
+    b[0] = 0.9999;
+    b[1] = -0.9999;
+    acce_1_new_HP_filtered[j] = butter_filter(acce_1_new[j], acce_1_old[j], acce_1_old_HP_filtered[j], a, b);
+    acce_2_new_HP_filtered[j] = butter_filter(acce_2_new[j], acce_2_old[j], acce_2_old_HP_filtered[j], a, b);
+
+    //low-pass filter acceeleration data
+    a[0] = 1;
+    a[1] = -0.5095;
+    b[0] = 0.2452;
+    b[1] = -0.2452;
+    acce_1_new_LP_filtered[j] = butter_filter(acce_1_new_HP_filtered[j], acce_1_old_HP_filtered[j], acce_1_old_LP_filtered[j], a, b);
+    acce_2_new_LP_filtered[j] = butter_filter(acce_2_new_HP_filtered[j], acce_2_old_HP_filtered[j], acce_2_old_LP_filtered[j], a, b);
+
+    acce_1_mag = sqrt(pow(acce_1_new_LP_filtered[0], 2) + pow(acce_1_new_LP_filtered[1], 2) + pow(acce_1_new_LP_filtered[2], 2));
+    acce_2_mag = sqrt(pow(acce_2_new_LP_filtered[0], 2) + pow(acce_2_new_LP_filtered[1], 2) + pow(acce_2_new_LP_filtered[2], 2));
+  }
+    for (int j = 0; j < 3; j++)
+    {
     // get the velocity
-    vel_1[j][1] = vel_1[j][0] + acce_1[j][0] * interval_time * 0.001;
-    vel_2[j][1] = vel_2[j][0] + acce_2[j][0] * interval_time * 0.001;
+    vel_1_new[j] = vel_1_old[j] + acce_1_new_LP_filtered[j] * interval_time * 0.001;
+    vel_2_new[j] = vel_1_old[j] + acce_2_new_LP_filtered[j] * interval_time * 0.001;
+    if (acce_1_mag < 0.05)
+    {
+      vel_1_new[j] = 0;
+    }
+
+    if (acce_2_mag < 0.05)
+    {
+      vel_2_new[j] = 0;
+    }
+
     // get the distance
-    pos_1[j][1] = pos_1[j][0] + vel_1[j][0] * interval_time * 0.001;
-    pos_2[j][1] = pos_2[j][0] + vel_2[j][0] * interval_time * 0.001;
+    pos_1_new[j] = pos_1_old[j] + vel_1_new[j] * interval_time * 0.001;
+    pos_2_new[j] = pos_2_old[j] + vel_2_new[j] * interval_time * 0.001;
 
     // get ready for the next set of readings
-    acce_1[j][0] = acce_1[j][1];
-    vel_1[j][0] = vel_1[j][1];
-    pos_1[j][0] = pos_1[j][1];
+    acce_1_old[j] = acce_1_new[j];
+    acce_1_old_HP_filtered[j] = acce_1_new_HP_filtered[j];
+    acce_1_old_LP_filtered[j] = acce_1_new_LP_filtered[j];
+    vel_1_old[j] = vel_1_new[j];
+    pos_1_old[j] = pos_1_new[j];
 
-    acce_2[j][0] = acce_2[j][1];
-    vel_2[j][0] = vel_2[j][1];
-    pos_2[j][0] = pos_2[j][1];
+    acce_2_old[j] = acce_2_new[j];
+    acce_2_old_HP_filtered[j] = acce_2_new_HP_filtered[j];
+    acce_2_old_LP_filtered[j] = acce_2_new_LP_filtered[j];
+    vel_2_old[j] = vel_2_new[j];
+    pos_2_old[j] = pos_2_new[j];
   }
-
-
-
 
   float product = (quat1.w() * quat2.w() - quat1.x() * quat2.x() - quat1.y() * quat2.y() - quat1.z() * quat2.z());
   float  angle = (acos((product * 2 - 1) * sign) * 57.2958);
@@ -318,8 +377,9 @@ void loop(void)
 
   String pos_Data = "";
   seperator = ",";
-  pos_Data = addStringArray(vel_1[0], 2, pos_Data, countDecimal, seperator);
-  pos_Data = addStringArray(vel_2[0], 2, pos_Data, countDecimal, seperator);
+  pos_Data = addStringArray(pos_1_new, pos_Data, countDecimal, seperator);
+  pos_Data = addStringArray(pos_2_new, pos_Data, countDecimal, seperator);
+  delay(10);
   Serial.println(pos_Data);
 
   interval_time = new_time - old_time;

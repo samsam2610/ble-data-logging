@@ -28,6 +28,7 @@ unsigned long new_time;
 unsigned interval_time;
 uint32_t logtime;
 
+double acce_1_mat[4] = {0, 0, 0, 0};
 double acce_1_mag = 0;
 double acce_1_new[3] = {0, 0, 0};
 double acce_1_new_LP_filtered[3] = {0, 0, 0};
@@ -41,6 +42,7 @@ double acce_1_old_HP_filtered[3] = {0, 0, 0};
 double vel_1_old[3] = {0, 0, 0};
 double pos_1_old[3] = {0, 0, 0};
 
+double acce_2_mat[4] = {0, 0, 0, 0};
 double acce_2_mag = 0;
 double acce_2_new[3] = {0, 0, 0};
 double acce_2_new_LP_filtered[3] = {0, 0, 0};
@@ -56,6 +58,8 @@ double pos_2_old[3] = {0, 0, 0};
 
 double a[2] = {0, 0};
 double b[2] = {0, 0};
+
+int multiplier = 1;
 
 void error(const __FlashStringHelper*err)
 {
@@ -81,11 +85,11 @@ String addStringPlus( imu::Vector<3> dataIMU, String stringOriginal, int countDe
   return stringOriginal;
 }
 
-String addStringArray(double array[], String stringOriginal, int countDecimal, String seperator)
+String addStringArray(double array[], String stringOriginal, int countDecimal, int multipier, String seperator)
 {
   for (int j = 0; j < 3; j++)
   {
-    String value = String(array[j], countDecimal);
+    String value = String(array[j] * multiplier, countDecimal);
     stringOriginal = addString(value, stringOriginal, seperator);
   }
   return stringOriginal;
@@ -115,6 +119,16 @@ double butter_filter(double raw_new, double raw_old, double prev, double a[], do
   output = b[0]*raw_new + b[1]*raw_old - a[1]*prev;
   return output;
 }
+
+imu::Vector<3> rotate_data(imu::Vector<3> vec, imu::Quaternion quat)
+{
+  imu::Quaternion vec_quat;
+  imu::Quaternion temp_quat(0, vec.x(), vec.y(), vec.z());
+  vec_quat = quat * temp_quat;
+  vec_quat = vec_quat * quat.conjugate();
+  imu::Vector<3> out_vec(vec_quat.x(), vec_quat.y(), vec_quat.z());
+  return out_vec;
+ }
 
 void BLEsetup()
 {
@@ -264,8 +278,6 @@ void setup(void)
   BLEsetup();
   Sensorsetup();
   Calibrationsetup(bno1, bno2);
-
-
 }
 
 
@@ -289,6 +301,9 @@ void loop(void)
   quat2 = quat2.normalize();
 
   int sign = 1;
+
+  acce1 = rotate_data(acce1, quat1);
+  acce2 = rotate_data(acce2, quat2);
   acce_1_new[0] = double(acce1.x());
   acce_1_new[1] = double(acce1.y());
   acce_1_new[2] = double(acce1.z());
@@ -318,11 +333,12 @@ void loop(void)
     acce_1_mag = sqrt(pow(acce_1_new_LP_filtered[0], 2) + pow(acce_1_new_LP_filtered[1], 2) + pow(acce_1_new_LP_filtered[2], 2));
     acce_2_mag = sqrt(pow(acce_2_new_LP_filtered[0], 2) + pow(acce_2_new_LP_filtered[1], 2) + pow(acce_2_new_LP_filtered[2], 2));
   }
-    for (int j = 0; j < 3; j++)
-    {
+
+  for (int j = 0; j < 3; j++)
+  {
     // get the velocity
-    vel_1_new[j] = vel_1_old[j] + acce_1_new_LP_filtered[j] * interval_time * 0.001;
-    vel_2_new[j] = vel_1_old[j] + acce_2_new_LP_filtered[j] * interval_time * 0.001;
+    vel_1_new[j] = vel_1_old[j] + acce_1_new[j] * interval_time * 0.001;
+    vel_2_new[j] = vel_1_old[j] + acce_2_new[j] * interval_time * 0.001;
     if (acce_1_mag < 0.05)
     {
       vel_1_new[j] = 0;
@@ -376,10 +392,10 @@ void loop(void)
   }
 
   String pos_Data = "";
-  seperator = ",";
-  pos_Data = addStringArray(pos_1_new, pos_Data, countDecimal, seperator);
-  pos_Data = addStringArray(pos_2_new, pos_Data, countDecimal, seperator);
-  delay(10);
+  seperator = ", ";
+  multiplier = 100;
+  pos_Data = addStringArray(pos_1_new, pos_Data, countDecimal, multiplier, seperator);
+  pos_Data = addStringArray(pos_2_new, pos_Data, countDecimal, multiplier, seperator);
   Serial.println(pos_Data);
 
   interval_time = new_time - old_time;

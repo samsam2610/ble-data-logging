@@ -3,8 +3,9 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
+#include <string.h>
 #include "Adafruit_BNO055.h"
-#include "utility/imumaths.h"
+#include "imumaths.h"
 
 #if not defined (_VARIANT_ARDUINO_DUE_X_) && not defined (_VARIANT_ARDUINO_ZERO_)
 #include <SoftwareSerial.h>
@@ -32,6 +33,13 @@ double butter_filter(double raw_new, double raw_old, double prev, double a[], do
   return output;
 }
 
+double angle_calculat(double raw_data)
+{
+  double angle;
+  angle = (2 * acos(raw_data) * 57.2958);
+  return angle;
+}
+
 imu::Vector<3> rotate_data(imu::Vector<3> vec, imu::Quaternion quat)
 {
   imu::Quaternion vec_quat;
@@ -40,11 +48,10 @@ imu::Vector<3> rotate_data(imu::Vector<3> vec, imu::Quaternion quat)
   vec_quat = vec_quat * quat.conjugate();
   imu::Vector<3> out_vec(vec_quat.x(), vec_quat.y(), vec_quat.z());
   return out_vec;
- }
+}
 
 void setup(void)
 {
-  while (!Serial);
   delay(500);
 
   Serial.begin(9600);
@@ -52,7 +59,6 @@ void setup(void)
   Sensorsetup();
   Calibrationsetup(bno1, bno2);
 }
-
 
 //
 void loop(void)
@@ -69,6 +75,12 @@ void loop(void)
   imu::Quaternion quat2 = bno2.getQuat();
   imu::Vector<3> gyro2 = bno2.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
   imu::Vector<3> acce2 = bno2.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+
+  sensors_event_t bno1Event;
+  sensors_event_t bno2Event;
+
+  bno1.getEvent(&bno1Event);
+  bno2.getEvent(&bno2Event);
 
   quat1 = quat1.normalize();
   quat2 = quat2.normalize();
@@ -107,6 +119,8 @@ void loop(void)
     acce_2_mag = sqrt(pow(acce_2_new_LP_filtered[0], 2) + pow(acce_2_new_LP_filtered[1], 2) + pow(acce_2_new_LP_filtered[2], 2));
   }
 
+  pos_1_mag = 0;
+  pos_2_mag = 0;
   for (int j = 0; j < 3; j++)
   {
     // get the velocity
@@ -126,57 +140,79 @@ void loop(void)
     pos_1_new[j] = pos_1_old[j] + vel_1_new[j] * interval_time * 0.001;
     pos_2_new[j] = pos_2_old[j] + vel_2_new[j] * interval_time * 0.001;
 
+    a[0] = 1;
+    a[1] = -0.9752;
+    b[0] = 0.9876;
+    b[1] = -0.9876;
+    pos_1_new_HP_filtered[j] = butter_filter(pos_1_new[j], pos_1_old[j], pos_1_old_HP_filtered[j], a, b);
+    pos_2_new_HP_filtered[j] = butter_filter(pos_2_new[j], pos_2_old[j], pos_2_old_HP_filtered[j], a, b);
+
     // get ready for the next set of readings
     acce_1_old[j] = acce_1_new[j];
     acce_1_old_HP_filtered[j] = acce_1_new_HP_filtered[j];
     acce_1_old_LP_filtered[j] = acce_1_new_LP_filtered[j];
     vel_1_old[j] = vel_1_new[j];
     pos_1_old[j] = pos_1_new[j];
+    pos_1_mag = pos_1_mag + pow(pos_1_new_HP_filtered[j], 2);
+    pos_1_old_HP_filtered[j] = pos_1_new_HP_filtered[j];
 
     acce_2_old[j] = acce_2_new[j];
     acce_2_old_HP_filtered[j] = acce_2_new_HP_filtered[j];
     acce_2_old_LP_filtered[j] = acce_2_new_LP_filtered[j];
     vel_2_old[j] = vel_2_new[j];
     pos_2_old[j] = pos_2_new[j];
+    pos_2_mag = pos_2_mag + pow(pos_2_new_HP_filtered[j], 2);
+    pos_2_old_HP_filtered[j] = pos_2_new_HP_filtered[j];
   }
 
-  float product = (quat1.w() * quat2.w() - quat1.x() * quat2.x() - quat1.y() * quat2.y() - quat1.z() * quat2.z());
-  float  angle = (acos((product * 2 - 1) * sign) * 57.2958);
-  if (isnan(angle)) {
-    sign = -1;
-    angle = (acos(product * 2 - sign) * 57.2958) * sign;
-  }
+  pos_1_mag = sqrt(pos_1_mag);
+  pos_2_mag = sqrt(pos_2_mag);
 
+  imu::Quaternion product = quat1 * quat2 * quat1.conjugate();
+  double angle_w = angle_calculat(product.w());
+  double angle_x = angle_calculat(product.x());
+  double angle_y = angle_calculat(product.y());
+  double angle_z = angle_calculat(product.z());
 
   int countDecimal = 2;
   String stringTwo = "";
   String seperator = " ";
-  stringTwo = addStringPlus(gyro1, stringTwo, countDecimal, seperator);
-  stringTwo = addStringPlus(acce1, stringTwo, countDecimal, seperator);
-  stringTwo = addStringPlus(gyro2, stringTwo, countDecimal, seperator);
-  stringTwo = addStringPlus(acce2, stringTwo, countDecimal, seperator);
+
+  stringTwo = addString_Vector(gyro1, stringTwo, countDecimal, seperator);
+  stringTwo = addString_Vector(acce1, stringTwo, countDecimal, seperator);
+  stringTwo = addString_Vector(gyro2, stringTwo, countDecimal, seperator);
+  stringTwo = addString_Vector(acce2, stringTwo, countDecimal, seperator);
   stringTwo = addString(status_bno1, stringTwo, seperator);
   stringTwo = addString(status_bno2, stringTwo, seperator);
 
+  String pos_Data = "";
+  seperator = ",";
+  multiplier = 100;
+  pos_Data = addString_Array(pos_1_new_HP_filtered, pos_Data, countDecimal, multiplier, seperator);
+  pos_Data = addString_Array(pos_2_new_HP_filtered, pos_Data, countDecimal, multiplier, seperator);
+
+
+  String angle_data = "";
+  angle_data = addString(String(angle_w, 0), angle_data, seperator);
+  angle_data = addString(String(angle_x, 0), angle_data, seperator);
+  angle_data = addString(String(angle_y, 0), angle_data, seperator);
+  angle_data = addString(String(angle_z, 0), angle_data, seperator);
+  angle_data = addString(String(angle_z, 0), angle_data, seperator);
+  angle_data = addString(String(pos_1_mag*multiplier, 0), angle_data, seperator);
+  angle_data = addString(String(bno2Event.orientation.y, 0), angle_data, seperator);
+  angle_data = addString(String(interval_time), angle_data, seperator);
+
+  Serial.println(angle_data);
+
+
   if (ble.isConnected()) {
     ble.print("AT+BLEUARTTX=");
-    ble.print(stringTwo);
+    ble.print("s,");
+    ble.print(angle_data);
+    ble.print("e");
     ble.println("\\r\\n");
   }
-
-  String pos_Data = "";
-  seperator = ", ";
-  multiplier = 100;
-  pos_Data = addStringArray(pos_1_new, pos_Data, countDecimal, multiplier, seperator);
-  pos_Data = addStringArray(pos_2_new, pos_Data, countDecimal, multiplier, seperator);
-  Serial.println(pos_Data);
-
   interval_time = new_time - old_time;
+  delay(10);
   old_time = new_time;
-  // ble.println("AT+BLEUARTFIFO=TX");
-  // ble.readline();
-  // Serial.print("TX FIFO: ");
-  // Serial.println(ble.buffer);
-
-
 }

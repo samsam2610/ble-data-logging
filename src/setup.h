@@ -30,7 +30,7 @@ void Sensorsetup(void)
   if (!bno1.begin())
   {
     /* There was a problem detecting the BNO055 at 0x28 ... check your connections */
-    Serial.print("Ooops, no BNO055 detected at 0x28 ... Check your wiring or I2C ADDR!");
+    Serial.print("Ooops, no BNO055 detected at 0x29 ... Check your wiring or I2C ADDR!");
     while (1);
   }
 
@@ -38,7 +38,7 @@ void Sensorsetup(void)
   if (!bno2.begin())
   {
     /* There was a problem detecting the BNO055 at 0x29 ... check your connections */
-    Serial.print("Ooops, no BNO055 detected at 0x29 ... Check your wiring or I2C ADDR!");
+    Serial.print("Ooops, no BNO055 detected at 0x28 ... Check your wiring or I2C ADDR!");
     while (1);
   }
 
@@ -47,5 +47,4 @@ void Sensorsetup(void)
   bno2.setExtCrystalUse(true);
   delay(1000);
 }
-
 #endif

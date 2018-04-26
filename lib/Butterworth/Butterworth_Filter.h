@@ -19,10 +19,11 @@ public:
   void bandpass_filter  ( double a_lp[], double b_lp[], double a_hp[], double b_hp[] );
   void highpass_filter  ( double a_hp[], double b_hp[]  );
   void lowpass_filter ( double a_lp[], double b_lp[]  );
-  void move_variables ( imu::Vector<3> data_new, imu::Vector<3> data_new_HP_filtered, imu::Vector<3> data_new_LP_filtered  );
+  void move_variables (  );
   void set_data(imu::Vector<3> data_new);
   imu::Vector<3> get_data_HP_filtered();
   imu::Vector<3> get_data_LP_filtered();
+  imu::Vector<3> get_data_BP_filtered();
 
 private:
 

@@ -16,10 +16,13 @@
 #include "Adafruit_BluefruitLE_UART.h"
 #include "BluefruitConfig.h"
 
+#include "Butterworth_Filter.h"
+#include "Velocity_Position.h"
 #include "variables.h"
 #include "stringOperation.h"
 #include "calibration.h"
 #include "setup.h"
+
 
 #define FACTORYRESET_ENABLE         1
 #define MINIMUM_FIRMWARE_VERSION    "0.6.6"
@@ -97,30 +100,51 @@ void loop(void)
   acce_2_new[1] = double(acce2.y());
   acce_2_new[2] = double(acce2.z());
 
-  for (int j = 0; j < 3; j++)
-  {
-    //high-pass filter acceleration data
-    a[0] = 1;
-    a[1] = -0.9999;
-    b[0] = 0.9999;
-    b[1] = -0.9999;
-    acce_1_new_HP_filtered[j] = butter_filter(acce_1_new[j], acce_1_old[j], acce_1_old_HP_filtered[j], a, b);
-    acce_2_new_HP_filtered[j] = butter_filter(acce_2_new[j], acce_2_old[j], acce_2_old_HP_filtered[j], a, b);
+  acce_1.set_data(acce1);
+  acce_2.set_data(acce2);
+  a_hp[0] = 1;
+  a_hp[1] = -0.9999;
+  b_hp[0] = 0.9999;
+  b_hp[1] = -0.9999;
 
-    //low-pass filter acceeleration data
-    a[0] = 1;
-    a[1] = -0.5095;
-    b[0] = 0.2452;
-    b[1] = -0.2452;
-    acce_1_new_LP_filtered[j] = butter_filter(acce_1_new_HP_filtered[j], acce_1_old_HP_filtered[j], acce_1_old_LP_filtered[j], a, b);
-    acce_2_new_LP_filtered[j] = butter_filter(acce_2_new_HP_filtered[j], acce_2_old_HP_filtered[j], acce_2_old_LP_filtered[j], a, b);
+  a_lp[0] = 1;
+  a_lp[1] = -0.5095;
+  b_lp[0] = 0.2452;
+  b_lp[1] = -0.2452;
+  acce_1.bandpass_filter(a_lp, b_lp, a_hp, b_hp);
+  acce_2.bandpass_filter(a_lp, b_lp, a_hp, b_hp);
 
-    acce_1_mag = sqrt(pow(acce_1_new_LP_filtered[0], 2) + pow(acce_1_new_LP_filtered[1], 2) + pow(acce_1_new_LP_filtered[2], 2));
-    acce_2_mag = sqrt(pow(acce_2_new_LP_filtered[0], 2) + pow(acce_2_new_LP_filtered[1], 2) + pow(acce_2_new_LP_filtered[2], 2));
-  }
+  imu::Vector<3> acce_1_filtered = acce_1.get_data_BP_filtered();
+  imu::Vector<3> acce_2_filtered = acce_2.get_data_BP_filtered();
 
-  pos_1_mag = 0;
-  pos_2_mag = 0;
+  acce_1.move_variables();
+  acce_2.move_variables();
+
+
+  acce_1_mag = sqrt(pow(acce_1_filtered.x(), 2) + pow(acce_1_filtered.y(), 2) + pow(acce_1_filtered.z(), 2));
+  acce_2_mag = sqrt(pow(acce_2_filtered.x(), 2) + pow(acce_2_filtered.y(), 2) + pow(acce_2_filtered.z(), 2));
+
+
+  pos_1.set_data(acce1, interval_time, acce_1_mag, a_hp, b_hp);
+  pos_2.set_data(acce2, interval_time, acce_2_mag, a_hp, b_hp);
+  a_hp[0] = 1;
+  a_hp[1] = -0.9752;
+  b_hp[0] = 0.9876;
+  b_hp[1] = -0.9876;
+  pos_1.calculate_velocity();
+  pos_1.calculate_position();
+  pos_1.calculate_position_mag();
+  imu::Vector<3> pos_1_filtered = pos_1.get_Position_HP_filtered();
+  double pos_1_magg = pos_1.get_Position_mag();
+  pos_1.move_variables();
+
+  pos_2.calculate_velocity();
+  pos_2.calculate_position();
+  pos_2.calculate_position_mag();
+  imu::Vector<3> pos_2_filtered = pos_2.get_Position_HP_filtered();
+  double pos_2_magg = pos_1.get_Position_mag();
+  pos_2.move_variables();
+
   for (int j = 0; j < 3; j++)
   {
     // get the velocity
@@ -148,17 +172,11 @@ void loop(void)
     pos_2_new_HP_filtered[j] = butter_filter(pos_2_new[j], pos_2_old[j], pos_2_old_HP_filtered[j], a, b);
 
     // get ready for the next set of readings
-    acce_1_old[j] = acce_1_new[j];
-    acce_1_old_HP_filtered[j] = acce_1_new_HP_filtered[j];
-    acce_1_old_LP_filtered[j] = acce_1_new_LP_filtered[j];
     vel_1_old[j] = vel_1_new[j];
     pos_1_old[j] = pos_1_new[j];
     pos_1_mag = pos_1_mag + pow(pos_1_new_HP_filtered[j], 2);
     pos_1_old_HP_filtered[j] = pos_1_new_HP_filtered[j];
 
-    acce_2_old[j] = acce_2_new[j];
-    acce_2_old_HP_filtered[j] = acce_2_new_HP_filtered[j];
-    acce_2_old_LP_filtered[j] = acce_2_new_LP_filtered[j];
     vel_2_old[j] = vel_2_new[j];
     pos_2_old[j] = pos_2_new[j];
     pos_2_mag = pos_2_mag + pow(pos_2_new_HP_filtered[j], 2);
@@ -176,21 +194,27 @@ void loop(void)
 
   int countDecimal = 2;
   String stringTwo = "";
-  String seperator = " ";
+  String seperator = ",";
 
-  stringTwo = addString_Vector(gyro1, stringTwo, countDecimal, seperator);
-  stringTwo = addString_Vector(acce1, stringTwo, countDecimal, seperator);
-  stringTwo = addString_Vector(gyro2, stringTwo, countDecimal, seperator);
-  stringTwo = addString_Vector(acce2, stringTwo, countDecimal, seperator);
-  stringTwo = addString(status_bno1, stringTwo, seperator);
-  stringTwo = addString(status_bno2, stringTwo, seperator);
+  // stringTwo = addString_Vector(gyro1, stringTwo, countDecimal, seperator);
+  // stringTwo = addString_Vector(acce1, stringTwo, countDecimal, seperator);
+  // stringTwo = addString_Vector(gyro2, stringTwo, countDecimal, seperator);
+  // stringTwo = addString_Vector(acce2, stringTwo, countDecimal, seperator);
+  // stringTwo = addString(status_bno1, stringTwo, seperator);
+  // stringTwo = addString(status_bno2, stringTwo, seperator);
+
+  stringTwo = addString_Vector(pos_1_filtered, stringTwo, countDecimal, seperator);
+  stringTwo = addString_Vector(pos_2_filtered, stringTwo, countDecimal, seperator);
 
   String pos_Data = "";
   seperator = ",";
-  multiplier = 100;
+  multiplier = 1;
   pos_Data = addString_Array(pos_1_new_HP_filtered, pos_Data, countDecimal, multiplier, seperator);
   pos_Data = addString_Array(pos_2_new_HP_filtered, pos_Data, countDecimal, multiplier, seperator);
-
+  Serial.print("New: ");
+  Serial.print(stringTwo);
+  Serial.print("Old: ");
+  Serial.println(pos_Data);
 
   String angle_data = "";
   angle_data = addString(String(angle_w, 0), angle_data, seperator);
@@ -202,7 +226,7 @@ void loop(void)
   angle_data = addString(String(bno2Event.orientation.y, 0), angle_data, seperator);
   angle_data = addString(String(interval_time), angle_data, seperator);
 
-  Serial.println(angle_data);
+
 
 
   if (ble.isConnected()) {
@@ -213,6 +237,6 @@ void loop(void)
     ble.println("\\r\\n");
   }
   interval_time = new_time - old_time;
-  delay(10);
+  delay(100);
   old_time = new_time;
 }

@@ -16,11 +16,11 @@ Butterworth_Filter::Butterworth_Filter()
 }
 
 // Setter
-void Butterworth_Filter::set_data(imu::Vector<3> data_new)
+void Butterworth_Filter::set_data(imu::Vector<3> _data_new)
 {
   for (int j = 0; j < 3; j++)
   {
-    data_new[j] = data_new[j];
+    data_new[j] = _data_new[j];
   }
 }
 
@@ -35,6 +35,10 @@ imu::Vector<3> Butterworth_Filter::get_data_LP_filtered()
   return data_new_LP_filtered;
 }
 
+imu::Vector<3> Butterworth_Filter::get_data_BP_filtered()
+{
+  return data_new_LP_filtered;
+}
 
 //Filter functions
 imu::Vector<3> Butterworth_Filter::butter_filter(imu::Vector<3> raw_new, imu::Vector<3> raw_old, imu::Vector<3> prev, double a[], double b[])
@@ -63,7 +67,7 @@ void Butterworth_Filter::lowpass_filter(double a_lp[], double b_lp[])
   data_new_LP_filtered = butter_filter(data_new, data_1st, data_1st_LP_filtered, a_lp, b_lp);
 }
 
-void Butterworth_Filter::move_variables(imu::Vector<3> data_new, imu::Vector<3> data_new_HP_filtered, imu::Vector<3> data_new_LP_filtered)
+void Butterworth_Filter::move_variables()
 {
   for (int j = 0; j < 3; j++)
   {

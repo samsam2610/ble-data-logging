@@ -7,57 +7,35 @@ Adafruit_BNO055 bno2 = Adafruit_BNO055(56, 0x28);
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 //Filtered objects
-Butterworth_Filter acce_1_filtered = Butterworth_Filter();
-Butterworth_Filter acce_2_filtered = Butterworth_Filter();
+Butterworth_Filter acce_1 = Butterworth_Filter();
+Butterworth_Filter acce_2 = Butterworth_Filter();
+
+Velocity_Position pos_1 = Velocity_Position();
+Velocity_Position pos_2 = Velocity_Position();
+
 unsigned long old_time;
 unsigned long new_time;
 unsigned interval_time;
 uint32_t logtime;
 
 // First IMU unit
-double acce_1_mat[4] = {0, 0, 0, 0};
-double acce_1_mag = 0;
-
-double acce_1_new[3] = {0, 0, 0};
-double acce_1_new_LP_filtered[3] = {0, 0, 0};
-double acce_1_new_HP_filtered[3] = {0, 0, 0};
-
-double vel_1_new[3] = {0, 0, 0};
-double pos_1_new[3] = {0, 0, 0};
-double pos_1_new_HP_filtered[3] = {0, 0, 0};
-double pos_1_mag = 0;
-
-double acce_1_old[3] = {0, 0, 0};
-double acce_1_old_LP_filtered[3] = {0, 0, 0};
-double acce_1_old_HP_filtered[3] = {0, 0, 0};
-
-double vel_1_old[3] = {0, 0, 0};
-
-double pos_1_old[3] = {0, 0, 0};
-double pos_1_old_HP_filtered[3] = {0, 0, 0};
+imu::Vector<3> acce_1_filtered;
+imu::Vector<3> pos_1_filtered;
+double pos_1_mag
 
 // Second IMU unit
-double acce_2_mat[4] = {0, 0, 0, 0};
-double acce_2_mag = 0;
-double acce_2_new[3] = {0, 0, 0};
-double acce_2_new_LP_filtered[3] = {0, 0, 0};
-double acce_2_new_HP_filtered[3] = {0, 0, 0};
-
-double vel_2_new[3] = {0, 0, 0};
-double pos_2_new[3] = {0, 0, 0};
-double pos_2_new_HP_filtered[3] = {0, 0, 0};
-
-double acce_2_old[3] = {0, 0, 0};
-double acce_2_old_LP_filtered[3] = {0, 0, 0};
-double acce_2_old_HP_filtered[3] = {0, 0, 0};
-
-double vel_2_old[3] = {0, 0, 0};
-double pos_2_old[3] = {0, 0, 0};
-double pos_2_old_HP_filtered[3] = {0, 0, 0};
-double pos_2_mag = 0;
+imu::Vector<3> acce_2_filtered;
+imu::Vector<3> pos_2_filtered;
+double pos_2_mag 
 
 double a[2] = {0, 0};
 double b[2] = {0, 0};
+
+double a_lp[2] = {0, 0};
+double b_lp[2] = {0, 0};
+
+double a_hp[2] = {0, 0};
+double b_hp[2] = {0, 0};
 
 int multiplier = 1;
 

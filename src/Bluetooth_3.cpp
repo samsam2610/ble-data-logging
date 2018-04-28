@@ -28,11 +28,13 @@
 #define MINIMUM_FIRMWARE_VERSION    "0.6.6"
 #define MODE_LED_BEHAVIOUR          "MODE"
 
-
-double butter_filter(double raw_new, double raw_old, double prev, double a[], double b[])
+imu::Quaternion angle_calculate(imu::Quaternion product)
 {
-  double output;
-  output = b[0]*raw_new + b[1]*raw_old - a[1]*prev;
+  imu::Quaternion output;
+  output.w() = 2 * acos(product.w()) * 57.2958;
+  output.x() = 2 * acos(product.x()) * 57.2958;
+  output.y() = 2 * acos(product.y()) * 57.2958;
+  output.z() = 2 * acos(product.z()) * 57.2958;
   return output;
 }
 
@@ -74,10 +76,12 @@ void loop(void)
   imu::Quaternion quat1 = bno1.getQuat();
   imu::Vector<3> gyro1 = bno1.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
   imu::Vector<3> acce1 = bno1.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+  imu::Vector<3> grav1 = bno1.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
 
   imu::Quaternion quat2 = bno2.getQuat();
   imu::Vector<3> gyro2 = bno2.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
   imu::Vector<3> acce2 = bno2.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+  imu::Vector<3> grav2 = bno2.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
 
   sensors_event_t bno1Event;
   sensors_event_t bno2Event;
@@ -92,151 +96,123 @@ void loop(void)
 
   acce1 = rotate_data(acce1, quat1);
   acce2 = rotate_data(acce2, quat2);
-  acce_1_new[0] = double(acce1.x());
-  acce_1_new[1] = double(acce1.y());
-  acce_1_new[2] = double(acce1.z());
 
-  acce_2_new[0] = double(acce2.x());
-  acce_2_new[1] = double(acce2.y());
-  acce_2_new[2] = double(acce2.z());
-
-  acce_1.set_data(acce1);
-  acce_2.set_data(acce2);
-  a_hp[0] = 1;
-  a_hp[1] = -0.9999;
-  b_hp[0] = 0.9999;
-  b_hp[1] = -0.9999;
-
-  a_lp[0] = 1;
-  a_lp[1] = -0.5095;
-  b_lp[0] = 0.2452;
-  b_lp[1] = -0.2452;
-  acce_1.bandpass_filter(a_lp, b_lp, a_hp, b_hp);
-  acce_2.bandpass_filter(a_lp, b_lp, a_hp, b_hp);
-
-  imu::Vector<3> acce_1_filtered = acce_1.get_data_BP_filtered();
-  imu::Vector<3> acce_2_filtered = acce_2.get_data_BP_filtered();
-
-  acce_1.move_variables();
-  acce_2.move_variables();
+  // acce_1.set_data(acce1);
+  // acce_2.set_data(acce2);
+  // a_hp[0] = 1;
+  // a_hp[1] = -0.9997;
+  // b_hp[0] = 0.9999;
+  // b_hp[1] = -0.9999;
+  //
+  //
+  // a_lp[0] = 1;
+  // a_lp[1] = -0.1584;
+  // b_lp[0] = 0.5792;
+  // b_lp[1] = -0.5792;
+  // acce_1.bandpass_filter(a_lp, b_lp, a_hp, b_hp);
+  // acce_2.bandpass_filter(a_lp, b_lp, a_hp, b_hp);
+  //
+  // imu::Vector<3> acce_1_filtered = acce_1.get_data_BP_filtered();
+  // imu::Vector<3> acce_2_filtered = acce_2.get_data_BP_filtered();
+  //
+  // acce_1.move_variables();
+  // acce_2.move_variables();
 
 
-  acce_1_mag = sqrt(pow(acce_1_filtered.x(), 2) + pow(acce_1_filtered.y(), 2) + pow(acce_1_filtered.z(), 2));
-  acce_2_mag = sqrt(pow(acce_2_filtered.x(), 2) + pow(acce_2_filtered.y(), 2) + pow(acce_2_filtered.z(), 2));
+  acce_1_mag = sqrt(pow(acce1.x(), 2) + pow(acce1.y(), 2) + pow(acce1.z(), 2));
+  acce_2_mag = sqrt(pow(acce2.x(), 2) + pow(acce2.y(), 2) + pow(acce2.z(), 2));
+
+  // a_hp[0] = 1;
+  // a_hp[1] = -0.9752;
+  // b_hp[0] = 0.9876;
+  // b_hp[1] = -0.9876;
+
+  // pos_1.set_data(acce1, interval_time, acce_1_mag);
+  // pos_1.set_filter_coeff(a_hp, b_hp);
+  // pos_1.set_multiplier(1);
+  // pos_1.calculate_velocity();
+  // pos_1.calculate_position();
+  // pos_1.calculate_position_mag();
+  // pos_1_filtered = pos_1.get_Position_HP_filtered();
+  // pos_1_mag = pos_1.get_Position_mag();
+  // pos_1.move_variables();
+  //
+  // pos_2.set_data(acce2, interval_time, acce_2_mag);
+  // pos_2.set_filter_coeff(a_hp, b_hp);
+  // pos_2.set_multiplier(1);
+  // pos_2.calculate_velocity();
+  // pos_2.calculate_position();
+  // pos_2.calculate_position_mag();
+  // pos_2_filtered = pos_2.get_Position_HP_filtered();
+  // pos_2_mag = pos_1.get_Position_mag();
+  // pos_2.move_variables();
 
 
-  pos_1.set_data(acce1, interval_time, acce_1_mag, a_hp, b_hp);
-  pos_2.set_data(acce2, interval_time, acce_2_mag, a_hp, b_hp);
-  a_hp[0] = 1;
-  a_hp[1] = -0.9752;
-  b_hp[0] = 0.9876;
-  b_hp[1] = -0.9876;
-  pos_1.calculate_velocity();
-  pos_1.calculate_position();
-  pos_1.calculate_position_mag();
-  imu::Vector<3> pos_1_filtered = pos_1.get_Position_HP_filtered();
-  double pos_1_magg = pos_1.get_Position_mag();
-  pos_1.move_variables();
+  imu::Quaternion product = quat2 * quat1.conjugate();
+  imu::Quaternion angle = angle_calculate(product);
 
-  pos_2.calculate_velocity();
-  pos_2.calculate_position();
-  pos_2.calculate_position_mag();
-  imu::Vector<3> pos_2_filtered = pos_2.get_Position_HP_filtered();
-  double pos_2_magg = pos_1.get_Position_mag();
-  pos_2.move_variables();
 
-  for (int j = 0; j < 3; j++)
+  if (acce_1_mag < 0.5 && acce_2_mag < 0.5)
   {
-    // get the velocity
-    vel_1_new[j] = vel_1_old[j] + acce_1_new[j] * interval_time * 0.001;
-    vel_2_new[j] = vel_1_old[j] + acce_2_new[j] * interval_time * 0.001;
-    if (acce_1_mag < 0.05)
+    wait_time = wait_time + interval_time;
+    if (wait_time*0.001 > 5)
     {
-      vel_1_new[j] = 0;
+      offset.w() = angle.w();
+      offset.x() = angle.x();
+      offset.y() = angle.y();
+      offset.z() = angle.z();
     }
-
-    if (acce_2_mag < 0.05)
-    {
-      vel_2_new[j] = 0;
-    }
-
-    // get the distance
-    pos_1_new[j] = pos_1_old[j] + vel_1_new[j] * interval_time * 0.001;
-    pos_2_new[j] = pos_2_old[j] + vel_2_new[j] * interval_time * 0.001;
-
-    a[0] = 1;
-    a[1] = -0.9752;
-    b[0] = 0.9876;
-    b[1] = -0.9876;
-    pos_1_new_HP_filtered[j] = butter_filter(pos_1_new[j], pos_1_old[j], pos_1_old_HP_filtered[j], a, b);
-    pos_2_new_HP_filtered[j] = butter_filter(pos_2_new[j], pos_2_old[j], pos_2_old_HP_filtered[j], a, b);
-
-    // get ready for the next set of readings
-    vel_1_old[j] = vel_1_new[j];
-    pos_1_old[j] = pos_1_new[j];
-    pos_1_mag = pos_1_mag + pow(pos_1_new_HP_filtered[j], 2);
-    pos_1_old_HP_filtered[j] = pos_1_new_HP_filtered[j];
-
-    vel_2_old[j] = vel_2_new[j];
-    pos_2_old[j] = pos_2_new[j];
-    pos_2_mag = pos_2_mag + pow(pos_2_new_HP_filtered[j], 2);
-    pos_2_old_HP_filtered[j] = pos_2_new_HP_filtered[j];
+  } else {
+    wait_time = 0;
   }
 
-  pos_1_mag = sqrt(pos_1_mag);
-  pos_2_mag = sqrt(pos_2_mag);
 
-  imu::Quaternion product = quat1 * quat2 * quat1.conjugate();
-  double angle_w = angle_calculat(product.w());
-  double angle_x = angle_calculat(product.x());
-  double angle_y = angle_calculat(product.y());
-  double angle_z = angle_calculat(product.z());
+  imu::Quaternion angle_w_offset;
+  angle_w_offset.w() = angle.w() - offset.w();
+  angle_w_offset.x() = angle.x() - offset.x();
+  angle_w_offset.y() = angle.y() - offset.y();
+  angle_w_offset.z() = angle.z() - offset.z();
 
-  int countDecimal = 2;
-  String stringTwo = "";
+  // int countDecimal = 2;
+  // String stringTwo = "";
   String seperator = ",";
-
-  // stringTwo = addString_Vector(gyro1, stringTwo, countDecimal, seperator);
-  // stringTwo = addString_Vector(acce1, stringTwo, countDecimal, seperator);
-  // stringTwo = addString_Vector(gyro2, stringTwo, countDecimal, seperator);
-  // stringTwo = addString_Vector(acce2, stringTwo, countDecimal, seperator);
-  // stringTwo = addString(status_bno1, stringTwo, seperator);
-  // stringTwo = addString(status_bno2, stringTwo, seperator);
-
-  stringTwo = addString_Vector(pos_1_filtered, stringTwo, countDecimal, seperator);
-  stringTwo = addString_Vector(pos_2_filtered, stringTwo, countDecimal, seperator);
-
-  String pos_Data = "";
+  //
+  // // stringTwo = addString_Vector(gyro1, stringTwo, countDecimal, seperator);
+  // // stringTwo = addString_Vector(acce1, stringTwo, countDecimal, seperator);
+  // // stringTwo = addString_Vector(gyro2, stringTwo, countDecimal, seperator);
+  // // stringTwo = addString_Vector(acce2, stringTwo, countDecimal, seperator);
+  // // stringTwo = addString(status_bno1, stringTwo, seperator);
+  // // stringTwo = addString(status_bno2, stringTwo, seperator);
+  //
+  // stringTwo = addString_Vector(grav1, stringTwo, countDecimal, seperator);
+  // stringTwo = addString_Vector(grav2, stringTwo, countDecimal, seperator);
+  //
+  // String pos_Data = "";
   seperator = ",";
   multiplier = 1;
-  pos_Data = addString_Array(pos_1_new_HP_filtered, pos_Data, countDecimal, multiplier, seperator);
-  pos_Data = addString_Array(pos_2_new_HP_filtered, pos_Data, countDecimal, multiplier, seperator);
-  Serial.print("New: ");
-  Serial.print(stringTwo);
-  Serial.print("Old: ");
-  Serial.println(pos_Data);
+  // pos_Data = addString_Array(pos_1_new_HP_filtered, pos_Data, countDecimal, multiplier, seperator);
+  // pos_Data = addString_Array(pos_2_new_HP_filtered, pos_Data, countDecimal, multiplier, seperator);
 
   String angle_data = "";
-  angle_data = addString(String(angle_w, 0), angle_data, seperator);
-  angle_data = addString(String(angle_x, 0), angle_data, seperator);
-  angle_data = addString(String(angle_y, 0), angle_data, seperator);
-  angle_data = addString(String(angle_z, 0), angle_data, seperator);
-  angle_data = addString(String(angle_z, 0), angle_data, seperator);
-  angle_data = addString(String(pos_1_mag*multiplier, 0), angle_data, seperator);
-  angle_data = addString(String(bno2Event.orientation.y, 0), angle_data, seperator);
-  angle_data = addString(String(interval_time), angle_data, seperator);
+  angle_data = addString(String(angle_w_offset.w(), 0), angle_data, seperator);
+  angle_data = addString(String(angle_w_offset.x(), 0), angle_data, seperator);
+  angle_data = addString(String(angle_w_offset.y(), 0), angle_data, seperator);
+  angle_data = addString(String(angle_w_offset.z(), 0), angle_data, seperator);
+  //angle_data = addString(String(pos_1_mag*multiplier, 0), angle_data, seperator);
+//  angle_data = addString(String(bno2Event.orientation.y, 0), angle_data, seperator);
+  //angle_data = addString(String(interval_time), angle_data, seperator);
 
 
-
-
-  if (ble.isConnected()) {
-    ble.print("AT+BLEUARTTX=");
-    ble.print("s,");
-    ble.print(angle_data);
-    ble.print("e");
-    ble.println("\\r\\n");
+  if (interval_time < 200)
+  {
+    if (ble.isConnected()) {
+      ble.print("AT+BLEUARTTX=");
+      ble.print(angle_data);
+      ble.println("\\r\\n");
+    }
   }
+
   interval_time = new_time - old_time;
-  delay(100);
   old_time = new_time;
+  delay(150);
 }

@@ -14,19 +14,32 @@ Velocity_Position::Velocity_Position()
     Position_1st_filtered[j] = 0;
   }
   Butterworth_Filter Position = Butterworth_Filter();
+  Butterworth_Filter Velocity = Butterworth_Filter();
 }
 
 // Setter;
-void Velocity_Position::set_data(imu::Vector<3> _accel, unsigned _interval_time, double _accel_mag, double _a_hp[], double _b_hp[])
+void Velocity_Position::set_data(imu::Vector<3> _accel, unsigned _interval_time, double _accel_mag)
 {
   interval_time = _interval_time;
   accel_mag = _accel_mag;
   for (int j = 0; j < 3; j++)
   {
-    accel[j] = _accel[j];
+    accel[j] = _accel[j] * multiplier;
+  }
+}
+
+void Velocity_Position::set_filter_coeff(double _a_hp[], double _b_hp[])
+{
+  for (int j = 0; j < 3; j++)
+  {
     a_hp[j] = _a_hp[j];
     b_hp[j] = _b_hp[j];
   }
+}
+
+void Velocity_Position::set_multiplier(int _multiplier)
+{
+  multiplier = _multiplier;
 }
 // Getter;
 imu::Vector<3> Velocity_Position::get_Position_HP_filtered()
@@ -49,13 +62,16 @@ void Velocity_Position::calculate_velocity()
       Velocity_new[j] = 0;
     }
   }
+    Velocity.set_data(Velocity_new);
+    Velocity.highpass_filter(a_hp, b_hp);
+    Velocity_new_filtered = Velocity.get_data_HP_filtered();
 }
 
 void Velocity_Position::calculate_position()
 {
   for (int j = 0; j < 3; j++)
   {
-    Position_new[j] = Position_1st[j] + Velocity_new[j] * interval_time * 0.001;
+    Position_new[j] = Position_1st[j] + Velocity_new_filtered[j] * interval_time * 0.001;
   }
   Position.set_data(Position_new);
   Position.highpass_filter(a_hp, b_hp);
@@ -75,10 +91,13 @@ void Velocity_Position::calculate_position_mag()
 
 void Velocity_Position::move_variables()
 {
+  Position.move_variables();
+  Velocity.move_variables();
   for (int j = 0; j < 3; j++)
   {
     Velocity_1st[j] = Velocity_new[j];
     Position_1st[j] = Position_new[j];
+    Velocity_1st_filtered[j] = Velocity_new_filtered[j];
     Position_1st_filtered[j] = Position_new_filtered[j];
   }
 }

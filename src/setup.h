@@ -18,10 +18,12 @@ void BLEsetup()
   ble.echo(false);
   ble.info();
   ble.verbose(false);
-  //  while (! ble.isConnected()) {
-  //    delay(500);
-  //  }
-  // ble.setMode(BLUEFRUIT_MODE_DATA);
+  while (! ble.isConnected())
+  {
+    delay(500);
+  }
+  delay(10);
+  ble.setMode(BLUEFRUIT_MODE_DATA);
   delay(3000);
 }
 
@@ -30,7 +32,7 @@ void Sensorsetup(void)
   if (!bno1.begin())
   {
     /* There was a problem detecting the BNO055 at 0x28 ... check your connections */
-    Serial.print("Ooops, no BNO055 detected at 0x29 ... Check your wiring or I2C ADDR!");
+    Serial.print("Ooops, no BNO055 detected at 0x28 ... Check your wiring or I2C ADDR!");
     while (1);
   }
 
@@ -38,7 +40,7 @@ void Sensorsetup(void)
   if (!bno2.begin())
   {
     /* There was a problem detecting the BNO055 at 0x29 ... check your connections */
-    Serial.print("Ooops, no BNO055 detected at 0x28 ... Check your wiring or I2C ADDR!");
+    Serial.print("Ooops, no BNO055 detected at 0x29 ... Check your wiring or I2C ADDR!");
     while (1);
   }
 

@@ -6,8 +6,8 @@ Adafruit_BNO055 bno1 = Adafruit_BNO055(55, 0x28);
 Adafruit_BNO055 bno2 = Adafruit_BNO055(56, 0x29);
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
-const int analogIn1 = A3;
-const int analogIn3 = A5;
+const int analogIn1 = A0;
+const int analogIn3 = A1;
 
 //Filtered objects
 Butterworth_Filter acce_1 = Butterworth_Filter();

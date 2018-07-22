@@ -86,14 +86,11 @@ void setup(void)
 {
   delay(500);
   Serial.begin(9600);
-
+  pinMode(LED_BUILTIN, OUTPUT);
   Sensorsetup();
   Calibrationsetup(bno1, bno2);
-  // BLEsetup();
-  offset.w() = 0;
-  offset.x() = 0;
-  offset.y() = 0;
-  offset.z() = 0;
+  BLEsetup();
+  CalibrationStatus(bno1, 1);
 }
 
 //
@@ -106,12 +103,12 @@ void loop(void)
 
   imu::Quaternion quat1 = bno1.getQuat();
   imu::Vector<3> gyro1 = bno1.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
-  imu::Vector<3> acce1 = bno1.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+  imu::Vector<3> acce1 = bno1.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
   imu::Vector<3> grav1 = bno1.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
 
   imu::Quaternion quat2 = bno2.getQuat();
   imu::Vector<3> gyro2 = bno2.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
-  imu::Vector<3> acce2 = bno2.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+  imu::Vector<3> acce2 = bno2.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
   imu::Vector<3> grav2 = bno2.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
 
   sensors_event_t bno1Event;
@@ -119,6 +116,13 @@ void loop(void)
 
   bno1.getEvent(&bno1Event);
   bno2.getEvent(&bno2Event);
+
+  if (CalibrationStatus(bno1, 1) == CalibrationStatus(bno2, 1) && CalibrationStatus(bno1, 1) == "13333")
+  {
+    digitalWrite(LED_BUILTIN, HIGH);
+  } else {
+    digitalWrite(LED_BUILTIN, LOW);
+  }
 
   quat1 = quat1.normalize();
   quat2 = quat2.normalize();
@@ -135,28 +139,6 @@ void loop(void)
   imu::Quaternion product = quat2 * quat1.conjugate();
   imu::Quaternion angle = angle_calculate(product);
 
-  if (acce_1_mag < 0.8 && acce_2_mag < 0.8)
-  {
-    wait_time = wait_time + interval_time;
-    if (wait_time*0.001 > 5)
-    {
-      offset.w() = angle.w();
-      offset.x() = angle.x();
-      offset.y() = angle.y();
-      offset.z() = angle.z();
-    }
-    motion = 0;
-  } else {
-    wait_time = 0;
-    motion = 1;
-  }
-
-  imu::Quaternion angle_w_offset;
-  angle_w_offset.w() = angle.w() - offset.w();
-  angle_w_offset.x() = angle.x() - offset.x();
-  angle_w_offset.y() = angle.y() - offset.y();
-  angle_w_offset.z() = angle.z() - offset.z();
-
   String seperator = ",";
 
   seperator = ",";
@@ -164,34 +146,32 @@ void loop(void)
 
   String angle_data = "";
   angle_data = addString("s", angle_data, seperator);
-  angle_data = addString(String(angle_w_offset.w(), 0), angle_data, seperator);
-  angle_data = addString(String(angle_w_offset.x(), 0), angle_data, seperator);
-  angle_data = addString(String(angle_w_offset.y(), 0), angle_data, seperator);
-  angle_data = addString(String(angle_w_offset.z(), 0), angle_data, seperator);
-  angle_data = addString(String(acce1.x(), 0), angle_data, seperator);
-  angle_data = addString(String(acce1.y(), 0), angle_data, seperator);
-  angle_data = addString(String(acce1.z(), 0), angle_data, seperator);
-  angle_data = addString(String(acce2.x(), 0), angle_data, seperator);
-  angle_data = addString(String(acce2.y(), 0), angle_data, seperator);
-  angle_data = addString(String(acce2.z(), 0), angle_data, seperator);
-  angle_data = addString(String(gyro1.x(), 0), angle_data, seperator);
-  angle_data = addString(String(gyro1.y(), 0), angle_data, seperator);
-  angle_data = addString(String(gyro1.z(), 0), angle_data, seperator);
-  angle_data = addString(String(gyro2.x(), 0), angle_data, seperator);
-  angle_data = addString(String(gyro2.y(), 0), angle_data, seperator);
-  angle_data = addString(String(gyro2.z(), 0), angle_data, seperator);
-  angle_data = addString(String(motion, 0), angle_data, seperator);
+  angle_data = addString(String(angle.w(), 0), angle_data, seperator);
+  angle_data = addString(String(angle.x(), 0), angle_data, seperator);
+  angle_data = addString(String(angle.y(), 0), angle_data, seperator);
+  angle_data = addString(String(angle.z(), 0), angle_data, seperator);
+  angle_data = addString(String(acce1.x(), 2), angle_data, seperator);
+  angle_data = addString(String(acce1.y(), 2), angle_data, seperator);
+  angle_data = addString(String(acce1.z(), 2), angle_data, seperator);
+  angle_data = addString(String(acce2.x(), 2), angle_data, seperator);
+  angle_data = addString(String(acce2.y(), 2), angle_data, seperator);
+  angle_data = addString(String(acce2.z(), 2), angle_data, seperator);
+  angle_data = addString(String(gyro1.x(), 2), angle_data, seperator);
+  angle_data = addString(String(gyro1.y(), 2), angle_data, seperator);
+  angle_data = addString(String(gyro1.z(), 2), angle_data, seperator);
+  angle_data = addString(String(gyro2.x(), 2), angle_data, seperator);
+  angle_data = addString(String(gyro2.y(), 2), angle_data, seperator);
+  angle_data = addString(String(gyro2.z(), 2), angle_data, seperator);
   angle_data = addString(String(Value1), angle_data, seperator);
   angle_data = addString(String(Value3), angle_data, seperator);
-  angle_data = addString(String(grav_2_max, 2), angle_data, seperator);
   angle_data = addString(String(interval_time), angle_data, seperator);
-  angle_data = addString("e", angle_data, seperator);
+  angle_data = addString("e", angle_data, "");
 
 
-  // if (ble.isConnected())
-  // {
-  //   ble.println(angle_data);
-  // }
+  if (ble.isConnected())
+  {
+    ble.println(angle_data);
+  }
 
   Serial.println(angle_data);
 

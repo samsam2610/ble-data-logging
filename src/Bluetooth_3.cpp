@@ -31,18 +31,11 @@
 imu::Quaternion angle_calculate(imu::Quaternion product)
 {
   imu::Quaternion output;
-  output.w() = 2 * acos(product.w()) * 57.2958;
-  output.x() = 2 * acos(product.x()) * 57.2958;
-  output.y() = 2 * acos(product.y()) * 57.2958;
-  output.z() = 2 * acos(product.z()) * 57.2958;
+  output.w() = product.w();
+  output.x() = product.x();
+  output.y() = product.y();
+  output.z() = product.z();
   return output;
-}
-
-double angle_calculat(double raw_data)
-{
-  double angle;
-  angle = (2 * acos(raw_data) * 57.2958);
-  return angle;
 }
 
 imu::Vector<3> rotate_data(imu::Vector<3> vec, imu::Quaternion quat)

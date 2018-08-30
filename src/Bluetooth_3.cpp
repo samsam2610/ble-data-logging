@@ -146,12 +146,12 @@ void loop(void)
   angle_data = addString(String(acce1.x(), 2), angle_data, seperator);
   angle_data = addString(String(acce1.y(), 2), angle_data, seperator);
   angle_data = addString(String(acce1.z(), 2), angle_data, seperator);
-  angle_data = addString(String(acce2.x(), 2), angle_data, seperator);
-  angle_data = addString(String(acce2.y(), 2), angle_data, seperator);
-  angle_data = addString(String(acce2.z(), 2), angle_data, seperator);
   angle_data = addString(String(gyro1.x(), 2), angle_data, seperator);
   angle_data = addString(String(gyro1.y(), 2), angle_data, seperator);
   angle_data = addString(String(gyro1.z(), 2), angle_data, seperator);
+  angle_data = addString(String(acce2.x(), 2), angle_data, seperator);
+  angle_data = addString(String(acce2.y(), 2), angle_data, seperator);
+  angle_data = addString(String(acce2.z(), 2), angle_data, seperator);
   angle_data = addString(String(gyro2.x(), 2), angle_data, seperator);
   angle_data = addString(String(gyro2.y(), 2), angle_data, seperator);
   angle_data = addString(String(gyro2.z(), 2), angle_data, seperator);
